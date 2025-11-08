@@ -39,14 +39,8 @@ const App: React.FC = () => {
     loadStudents(); // Reload the list when a student is updated
   };
 
-  const handleDeleteStudent = async (cpf: string) => {
-    try {
-      setError('');
-      await studentService.deleteStudent(cpf);
-      await loadStudents(); // Reload the list
-    } catch (err) {
-      setError((err as Error).message);
-    }
+  const handleStudentDeleted = () => {
+    loadStudents(); // Reload the list when a student is deleted
   };
 
   const handleEditClick = (student: Student) => {
@@ -85,8 +79,9 @@ const App: React.FC = () => {
 
         <StudentList
           students={students}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteStudent}
+          onStudentDeleted={handleStudentDeleted}
+          onEditStudent={handleEditClick}
+          onError={handleError}
           loading={loading}
         />
       </main>

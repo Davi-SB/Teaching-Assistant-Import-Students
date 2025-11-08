@@ -1,18 +1,35 @@
 import React from 'react';
 import { Student } from '../types/Student';
+import { studentService } from '../services/StudentService';
 
 interface StudentListProps {
   students: Student[];
-  onEdit: (student: Student) => void;
-  onDelete: (cpf: string) => Promise<void>;
+  onStudentDeleted: () => void;
+  onEditStudent: (student: Student) => void;
+  onError: (errorMessage: string) => void;
   loading: boolean;
 }
 
-const StudentList: React.FC<StudentListProps> = ({ students, onEdit, onDelete, loading }) => {
+const StudentList: React.FC<StudentListProps> = ({ 
+  students, 
+  onStudentDeleted, 
+  onEditStudent, 
+  onError, 
+  loading 
+}) => {
   const handleDelete = async (student: Student) => {
     if (window.confirm(`Are you sure you want to delete ${student.name}?`)) {
-      await onDelete(student.cpf);
+      try {
+        await studentService.deleteStudent(student.cpf);
+        onStudentDeleted();
+      } catch (error) {
+        onError((error as Error).message);
+      }
     }
+  };
+
+  const handleEdit = (student: Student) => {
+    onEditStudent(student);
   };
 
   if (loading) {
@@ -57,7 +74,7 @@ const StudentList: React.FC<StudentListProps> = ({ students, onEdit, onDelete, l
                 <td>
                   <button
                     className="edit-btn"
-                    onClick={() => onEdit(student)}
+                    onClick={() => handleEdit(student)}
                     title="Edit student"
                   >
                     Edit
