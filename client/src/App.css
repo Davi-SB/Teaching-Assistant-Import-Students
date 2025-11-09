@@ -389,10 +389,37 @@ tbody tr:last-child td {
 }
 
 .class-form {
-  display: grid;
-  grid-template-columns: 1fr 120px 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-row {
+  display: flex;
   gap: 1rem;
   align-items: end;
+}
+
+.topic-row {
+  flex-direction: column;
+}
+
+.year-semester-row .form-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+.year-semester-row .form-group select {
+  font-size: 1rem;
+  padding: 0.75rem;
+  width: 100%;
+}
+
+.year-semester-row .form-group label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #374151;
 }
 
 .class-form .form-group {
@@ -403,7 +430,6 @@ tbody tr:last-child td {
 .class-form .form-buttons {
   display: flex;
   gap: 0.5rem;
-  grid-column: 1 / -1;
 }
 
 .classes-list {
@@ -417,6 +443,28 @@ tbody tr:last-child td {
   background-color: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+}
+
+/* Classes table specific styling */
+.classes-list table th:nth-child(2),
+.classes-list table th:nth-child(3) {
+  font-size: 1rem;
+  text-align: center;
+  width: 120px;
+}
+
+.classes-list table td:nth-child(2),
+.classes-list table td:nth-child(3) {
+  font-size: 1rem;
+  text-align: center;
+  font-weight: 600;
+  color: #374151;
+}
+
+.classes-list table td:nth-child(4) {
+  text-align: center;
+  font-weight: 500;
+  color: #059669;
 }
 
 /* Evaluations Table */

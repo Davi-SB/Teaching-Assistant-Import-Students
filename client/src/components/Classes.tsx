@@ -114,46 +114,50 @@ const Classes: React.FC<ClassesProps> = ({
       <div className="class-form-container">
         <h3>{editingClass ? 'Edit Class' : 'Add New Class'}</h3>
         <form onSubmit={handleSubmit} className="class-form">
-          <div className="form-group">
-            <label htmlFor="topic">Topic:</label>
-            <input
-              type="text"
-              id="topic"
-              name="topic"
-              value={formData.topic}
-              onChange={handleInputChange}
-              placeholder="e.g., Software Engineering, Introduction to Programming"
-              required
-            />
+          <div className="form-row topic-row">
+            <div className="form-group">
+              <label htmlFor="topic">Topic:</label>
+              <input
+                type="text"
+                id="topic"
+                name="topic"
+                value={formData.topic}
+                onChange={handleInputChange}
+                placeholder="e.g., Software Engineering, Introduction to Programming"
+                required
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="year">Year:</label>
-            <select
-              id="year"
-              name="year"
-              value={formData.year}
-              onChange={handleInputChange}
-              required
-            >
-              {yearOptions.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
+          <div className="form-row year-semester-row">
+            <div className="form-group">
+              <label htmlFor="year">Year:</label>
+              <select
+                id="year"
+                name="year"
+                value={formData.year}
+                onChange={handleInputChange}
+                required
+              >
+                {yearOptions.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="semester">Semester:</label>
-            <select
-              id="semester"
-              name="semester"
-              value={formData.semester}
-              onChange={handleInputChange}
-              required
-            >
-              <option value={1}>1</option>
-              <option value={2}>2</option>
-            </select>
+            <div className="form-group">
+              <label htmlFor="semester">Semester:</label>
+              <select
+                id="semester"
+                name="semester"
+                value={formData.semester}
+                onChange={handleInputChange}
+                required
+              >
+                <option value={1}>1st Semester</option>
+                <option value={2}>2nd Semester</option>
+              </select>
+            </div>
           </div>
 
           <div className="form-buttons">
@@ -193,8 +197,8 @@ const Classes: React.FC<ClassesProps> = ({
                 {classes.map((classObj) => (
                   <tr key={getClassId(classObj)}>
                     <td><strong>{classObj.topic}</strong></td>
-                    <td>{classObj.year}</td>
-                    <td>{classObj.semester}</td>
+                    <td><strong>{classObj.year}</strong></td>
+                    <td><strong>{classObj.semester === 1 ? '1st Semester' : '2nd Semester'}</strong></td>
                     <td>{classObj.enrollments.length}</td>
                     <td>
                       <button
