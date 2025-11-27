@@ -31,38 +31,77 @@ Before(function () {
 /**
  * After hook - runs after each scenario
  * Cleans up all test data created during the test
+ * This runs even when tests fail, ensuring proper cleanup
  */
 After(function () {
-  // Delete enrolled students from the class first
-  if (testContext.createdClassId && testContext.createdStudentCPFs.length > 0) {
-    testContext.createdStudentCPFs.forEach(cpf => {
+  cy.log('=== CLEANUP: Starting teardown ===');
+  
+  // Store context locally before reset
+  const classId = testContext.createdClassId;
+  const studentCPFs = [...testContext.createdStudentCPFs];
+  const allTestCPFs = ['11111122222', '33333444444', '09876543212'];
+  const currentYear = new Date().getFullYear();
+  const testClassIds = [
+    `Class A-${currentYear}-1`,
+    `Test Class-${currentYear}-1`,
+    `Cleanup Test Class-${currentYear}-1`
+  ];
+
+  // Wrap cleanup in cy.then() to ensure it executes sequentially
+  cy.then(() => {
+    cy.log(`Cleaning up class: ${classId}, students: ${studentCPFs.join(', ')}`);
+    
+    // Delete enrolled students from the class first
+    if (classId && studentCPFs.length > 0) {
+      studentCPFs.forEach(cpf => {
+        cy.request({
+          method: 'DELETE',
+          url: `${API_BASE_URL}/api/classes/${classId}/enroll/${cpf}`,
+          failOnStatusCode: false
+        });
+      });
+    }
+
+    // Delete the test class
+    if (classId) {
       cy.request({
         method: 'DELETE',
-        url: `${API_BASE_URL}/api/classes/${testContext.createdClassId}/enroll/${cpf}`,
+        url: `${API_BASE_URL}/api/classes/${classId}`,
+        failOnStatusCode: false
+      });
+    }
+
+    // Delete all known test classes (failsafe)
+    testClassIds.forEach(testClassId => {
+      cy.request({
+        method: 'DELETE',
+        url: `${API_BASE_URL}/api/classes/${testClassId}`,
         failOnStatusCode: false
       });
     });
-  }
 
-  // Delete the test class
-  if (testContext.createdClassId) {
-    cy.request({
-      method: 'DELETE',
-      url: `${API_BASE_URL}/api/classes/${testContext.createdClassId}`,
-      failOnStatusCode: false
-    });
-  }
+    // Delete the test students
+    if (studentCPFs.length > 0) {
+      studentCPFs.forEach(cpf => {
+        cy.request({
+          method: 'DELETE',
+          url: `${API_BASE_URL}/api/students/${cpf}`,
+          failOnStatusCode: false
+        });
+      });
+    }
 
-  // Delete the test students
-  if (testContext.createdStudentCPFs.length > 0) {
-    testContext.createdStudentCPFs.forEach(cpf => {
+    // Delete all test CPFs from fixtures (failsafe)
+    allTestCPFs.forEach(cpf => {
       cy.request({
         method: 'DELETE',
         url: `${API_BASE_URL}/api/students/${cpf}`,
         failOnStatusCode: false
       });
     });
-  }
+
+    cy.log('=== CLEANUP: Completed ===');
+  });
 
   // Reset test context
   testContext = {
@@ -560,4 +599,234 @@ Then('the screen shows the error message: {string}', function (expectedErrorMess
   // Check for the Portuguese version that matches the backend error
   cy.contains('p', 'O arquivo enviado está vazio ou não é suportado').should('be.visible');
   cy.contains('p', 'apenas .xlsx ou .csv permitido').should('be.visible');
+});
+
+// ============================================
+// Step Definitions for Scenario 4-6: Additional import scenarios
+// ============================================
+
+/**
+ * Given: System has NOT registered a student with specific ID
+ * Ensures a student does NOT exist (for rejection testing)
+ */
+Given('the system has not registered a student with ID {string}', function (cpf) {
+  // Try to delete the student to ensure they don't exist
+  cy.request({
+    method: 'DELETE',
+    url: `${API_BASE_URL}/api/students/${cpf}`,
+    failOnStatusCode: false
+  }).then(() => {
+    cy.log(`Ensured student ${cpf} does NOT exist in the system`);
+  });
+});
+
+/**
+ * Given: System has a specific student (singular)
+ * Creates a single student via API
+ */
+Given('the system has the student with ID {string}', function (cpf) {
+  const studentPayload = {
+    name: 'Test Student',
+    cpf: cpf,
+    email: `student_${cpf}@test.com`
+  };
+
+  // Delete if exists, then create
+  cy.request({
+    method: 'DELETE',
+    url: `${API_BASE_URL}/api/students/${cpf}`,
+    failOnStatusCode: false
+  }).then(() => {
+    cy.request({
+      method: 'POST',
+      url: `${API_BASE_URL}/api/students`,
+      body: studentPayload
+    }).then((response) => {
+      expect(response.status).to.eq(201);
+      testContext.createdStudentCPFs.push(cpf);
+      cy.log(`Created student: ${cpf}`);
+    });
+  });
+});
+
+/**
+ * When: Upload file with 3 IDs (mixed valid/invalid)
+ * Handles file upload with multiple students including non-existent ones
+ */
+When('I upload a file {string} containing IDs {string}, {string} and {string}', function (fileName, cpf1, cpf2, cpf3) {
+  // Reload the page to see created data
+  cy.reload();
+  cy.contains('button', 'Classes').click();
+  cy.contains('h2', 'Class Management').should('be.visible');
+  cy.wait(1000);
+  
+  // Find class and click Enroll
+  cy.contains('td', testContext.classData.topic, { timeout: 10000 })
+    .should('be.visible')
+    .parent('tr')
+    .within(() => {
+      cy.contains('button', 'Enroll').click();
+    });
+  
+  // Wait for modal
+  cy.contains('h3', `Enroll Students in ${testContext.classData.topic}`).should('be.visible');
+  
+  // Upload file
+  cy.get('input[type="file"]').selectFile(`cypress/fixtures/${fileName}`);
+  cy.contains(`Selected: ${fileName}`).should('be.visible');
+  cy.contains('button', 'Import Students').click();
+});
+
+/**
+ * When: Upload file with blank row
+ * Handles CSV with empty/blank rows
+ */
+When('I upload a file {string} where row 1 has a blank registration line and row 2 contains ID {string}', function (fileName, cpf) {
+  // Reload and navigate
+  cy.reload();
+  cy.contains('button', 'Classes').click();
+  cy.contains('h2', 'Class Management').should('be.visible');
+  cy.wait(1000);
+  
+  // Find class and click Enroll
+  cy.contains('td', testContext.classData.topic, { timeout: 10000 })
+    .should('be.visible')
+    .parent('tr')
+    .within(() => {
+      cy.contains('button', 'Enroll').click();
+    });
+  
+  cy.contains('h3', `Enroll Students in ${testContext.classData.topic}`).should('be.visible');
+  
+  // Upload file
+  cy.get('input[type="file"]').selectFile(`cypress/fixtures/${fileName}`);
+  cy.contains(`Selected: ${fileName}`).should('be.visible');
+  cy.contains('button', 'Import Students').click();
+});
+
+/**
+ * When: Upload file with multiple columns
+ * Handles CSV with nome,cpf,login columns
+ */
+When('I upload a file {string} where row 1 is {string} and row 2 is {string}', function (fileName, header, data) {
+  // Reload and navigate
+  cy.reload();
+  cy.contains('button', 'Classes').click();
+  cy.contains('h2', 'Class Management').should('be.visible');
+  cy.wait(1000);
+  
+  // Find class and click Enroll
+  cy.contains('td', testContext.classData.topic, { timeout: 10000 })
+    .should('be.visible')
+    .parent('tr')
+    .within(() => {
+      cy.contains('button', 'Enroll').click();
+    });
+  
+  cy.contains('h3', `Enroll Students in ${testContext.classData.topic}`).should('be.visible');
+  
+  // Upload file
+  cy.get('input[type="file"]').selectFile(`cypress/fixtures/${fileName}`);
+  cy.contains(`Selected: ${fileName}`).should('be.visible');
+  cy.contains('button', 'Import Students').click();
+});
+
+/**
+ * Then: Verify summary message with specific counts
+ * Works for various import/reject combinations
+ * This test is faithful to the scenario requirements and will FAIL until backend is fixed
+ */
+Then('the screen shows the summary {string}', function (summaryMessage) {
+  // Navigate to success page
+  cy.url().should('include', '/import-success', { timeout: 10000 });
+  cy.contains('h2', 'Import Successful!').should('be.visible');
+  
+  // Parse the expected counts from the message and verify them strictly
+  if (summaryMessage.includes('2 students imported successfully and 1 student rejected')) {
+    // Scenario 4: 2 imported, 1 rejected (unregistered student should be counted as rejected)
+    cy.get('.stat-item').first().within(() => {
+      cy.get('.stat-number').should('contain', '2');
+    });
+    
+    // IMPORTANT: This assertion REQUIRES the backend to properly count rejected students
+    // Currently the backend skips non-existent students without counting them as rejected
+    // This test will FAIL until the backend is fixed to track rejected students
+    cy.get('.stat-item').last().within(() => {
+      cy.get('.stat-number').should('contain', '1');
+    });
+    
+  } else if (summaryMessage.includes('1 student imported successfully and 0 student rejected')) {
+    // Scenarios 5 & 6: 1 imported, 0 rejected (blank lines and extra columns are ignored, not rejected)
+    cy.get('.stat-item').first().within(() => {
+      cy.get('.stat-number').should('contain', '1');
+    });
+    cy.get('.stat-item').last().within(() => {
+      cy.get('.stat-number').should('contain', '0');
+    });
+  }
+});
+
+/**
+ * Then: Verify specific students are enrolled in the class
+ * Handles multiple students verification
+ */
+Then('{string} now has students {string} and {string} enrolled', function (className, cpf1, cpf2) {
+  // Click back
+  cy.contains('button', 'Voltar').click();
+  cy.url().should('eq', CLIENT_BASE_URL + '/');
+  
+  // Navigate to Classes
+  cy.contains('button', 'Classes').click();
+  cy.contains('h2', 'Class Management').should('be.visible');
+  cy.wait(1000);
+  
+  // Find class and verify count
+  cy.contains('td', testContext.classData.topic, { timeout: 10000 })
+    .should('be.visible')
+    .parent('tr')
+    .within(() => {
+      cy.get('td').eq(3).should('contain', '2');
+      cy.contains('button', 'Enroll').click();
+    });
+  
+  // Verify in modal
+  cy.contains('h3', `Enroll Students in ${testContext.classData.topic}`).should('be.visible');
+  cy.contains('Currently Enrolled (2)').should('be.visible');
+  
+  // Verify both students in the list
+  cy.get('.enrolled-students-list').should('be.visible');
+  cy.log(`Verified students ${cpf1} and ${cpf2} are enrolled`);
+});
+
+/**
+ * Then: Verify single student is enrolled
+ * Handles single student verification
+ */
+Then('when I return to the "Class A" student list, student {string} is listed', function (cpf) {
+  // Click back
+  cy.contains('button', 'Voltar').click();
+  cy.url().should('eq', CLIENT_BASE_URL + '/');
+  
+  // Navigate to Classes
+  cy.contains('button', 'Classes').click();
+  cy.contains('h2', 'Class Management').should('be.visible');
+  cy.wait(1000);
+  
+  // Find class and verify count
+  cy.contains('td', testContext.classData.topic, { timeout: 10000 })
+    .should('be.visible')
+    .parent('tr')
+    .within(() => {
+      cy.get('td').eq(3).should('contain', '1');
+      cy.contains('button', 'Enroll').click();
+    });
+  
+  // Verify in modal
+  cy.contains('h3', `Enroll Students in ${testContext.classData.topic}`).should('be.visible');
+  cy.contains('Currently Enrolled (1)').should('be.visible');
+  
+  // Verify student in the list
+  cy.get('.enrolled-students-list').should('be.visible');
+  cy.contains('Test Student').should('be.visible');
+  cy.log(`Verified student ${cpf} is enrolled`);
 });

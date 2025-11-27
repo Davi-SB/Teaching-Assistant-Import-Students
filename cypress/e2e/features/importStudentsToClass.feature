@@ -29,3 +29,37 @@ Scenario: Import with an empty file
     When I try to upload a file "vazia.csv" that contains no data rows
     Then I am redirected to the "Error case" screen
     And the screen shows the error message: "The uploaded file is empty or not supported (only .xlsx or .csv allowed). Please upload a file with valid registration numbers."
+
+Scenario: Partial import: registration not found in the student registry
+    Given I am logged in as a teacher and on the "Classes" tab
+    And the system has the class "Class A" with no enrolled students
+    And the system has registered students with IDs "11111122222" and "33333444444"
+    And the system has not registered a student with ID "09876543212"
+
+    When I upload a file "alunos-1-Not-2.csv" containing IDs "11111122222", "09876543212" and "33333444444"
+
+    Then I am redirected to the "Success" screen
+    And the screen shows the summary "2 students imported successfully and 1 student rejected"
+    And "Class A" now has students "11111122222" and "33333444444" enrolled
+
+Scenario: Partial import: blank registration
+    Given I am logged in as a teacher and on the "Classes" tab
+    And the system has the student with ID "11111122222"
+    And the system has the class "Class A" with no enrolled students
+
+    When I upload a file "alunos-blank-1.csv" where row 1 has a blank registration line and row 2 contains ID "11111122222"
+
+    Then I am redirected to the "Success" screen
+    And the screen shows the summary "1 student imported successfully and 0 student rejected"
+    And when I return to the "Class A" student list, student "11111122222" is listed
+
+Scenario: Multiple columns file
+    Given I am logged in as a teacher and on the "Classes" tab
+    And the system has the student with ID "11111122222"
+    And the system has the class "Class A" with no enrolled students
+
+    When I upload a file "alunos-col.csv" where row 1 is "nome,cpf,login" and row 2 is "anyName,11111122222,anyLogin"
+
+    Then I am redirected to the "Success" screen
+    And the screen shows the summary "1 student imported successfully and 0 student rejected"
+    And when I return to the "Class A" student list, student "11111122222" is listed
