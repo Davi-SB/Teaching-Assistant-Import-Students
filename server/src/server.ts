@@ -449,7 +449,7 @@ app.post('/api/classes/:classId/enroll-bulk', (req: Request, res: Response) => {
         const cpfValue = row.cpf || row.CPF || row.matricula || row.Matricula || row.Matrícula;
         
         if (!cpfValue) {
-          continue; // Skip rows without CPF
+          continue; // Skip rows without CPF (blank lines)
         }
 
         // Clean and convert CPF to string
@@ -459,21 +459,26 @@ app.post('/api/classes/:classId/enroll-bulk', (req: Request, res: Response) => {
         // Check if student exists
         const student = studentSet.findStudentByCPF(cleanedCPF);
         if (!student) {
-          continue; // Skip if student not found
+          // Student not found in the system - count as rejected
+          rejectedCount++;
+          console.log(`Student ${cleanedCPF} not found in system - rejected`);
+          continue;
         }
 
         // Check if student is already enrolled
         const existingEnrollment = classObj.findEnrollmentByStudentCPF(cleanedCPF);
         if (existingEnrollment) {
-          continue; // Skip if already enrolled (Scenario 2)
+          continue; // Skip if already enrolled (Scenario 2) - not counted as rejected
         }
 
         // Enroll the student (Scenario 1)
         try {
           classObj.addEnrollment(student);
           importedCount++;
+          console.log(`Student ${cleanedCPF} successfully enrolled`);
         } catch (error) {
-          // Error adding enrollment, skip this student
+          // Error adding enrollment, count as rejected
+          rejectedCount++;
           console.error(`Error enrolling student ${cleanedCPF}:`, error);
         }
       }
