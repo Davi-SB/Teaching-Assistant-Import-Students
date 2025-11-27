@@ -2,7 +2,7 @@ import { Class } from './Class';
 import { Enrollment } from './Enrollment';
 import { Grade } from './Evaluation';
 
-interface EvaluationPerformance {
+export interface EvaluationPerformance {
   goal: string;
   averageGrade: number;
   gradeDistribution: {
@@ -13,7 +13,16 @@ interface EvaluationPerformance {
   evaluatedStudents: number;
 }
 
-interface ReportData {
+export type StudentStatus = 'APPROVED' | 'APPROVED_FINAL' | 'FAILED';
+
+export interface StudentEntry {
+  studentId: string;
+  name: string;
+  finalGrade: number;
+  status: StudentStatus;
+}
+
+export interface ReportData {
   classId: string;
   topic: string;
   semester: number;
@@ -21,12 +30,18 @@ interface ReportData {
   totalEnrolled: number;
   studentsAverage: number;
   approvedCount: number;
+  approvedFinalCount: number;
   notApprovedCount: number;
   evaluationPerformance: EvaluationPerformance[];
+  students: StudentEntry[]; 
   generatedAt: Date;
 }
 
-export class Report {
+export interface IReportGenerator {
+  generate(): ReportData;
+}
+
+export class Report implements IReportGenerator {
   private classObj: Class;
 
   constructor(classObj: Class) {
@@ -88,7 +103,7 @@ export class Report {
     return { approved, notApproved };
   }
 
-  private calculateEvaluationPerformance(): EvaluationPerformance[] {
+  private calculateEvaluationPerformance(): EvaluationPerformance[] { 
     const enrollments = this.classObj.getEnrollments();
     const goalMap = new Map<string, {
       grades: Grade[];
@@ -144,17 +159,40 @@ export class Report {
     const enrollments = this.classObj.getEnrollments();
     const approvalStats = this.calculateApprovalStats();
     const evaluationPerformance = this.calculateEvaluationPerformance();
+    const classAverage = this.calculateClassAverage();
+
+    const studentsList: StudentEntry[] = enrollments.map(enrollment => {
+      const student = enrollment.getStudent();
+
+      const status = this.isStudentApproved(enrollment) ? 'APPROVED' : 'FAILED';
+      // const finalGrade = enrollment.calculateMediaPreFinal(); -- nao implementado ainda
+      const finalGrade = this.calculateStudentAverage(enrollment);
+
+      return {
+        studentId: student.getCPF(),
+        name: student.getName(),
+        finalGrade: Number(finalGrade.toFixed(2)),
+        status: status
+      };
+    });
+
+    studentsList.sort((a, b) => a.name.localeCompare(b.name));
+    const approvedCount = studentsList.filter(s => s.status === 'APPROVED').length;
+    const approvedFinalCount = studentsList.filter(s => s.status === 'APPROVED_FINAL').length;
+    const notApprovedCount = studentsList.filter(s => s.status === 'FAILED').length;
 
     return {
       classId: this.classObj.getClassId(),
       topic: this.classObj.getTopic(),
       semester: this.classObj.getSemester(),
       year: this.classObj.getYear(),
-      totalEnrolled: enrollments.length,
-      studentsAverage: Math.round(this.calculateClassAverage() * 100) / 100,
-      approvedCount: approvalStats.approved,
-      notApprovedCount: approvalStats.notApproved,
+      totalEnrolled: enrollments.length, 
+      studentsAverage: Number(classAverage.toFixed(2)),
+      approvedCount,
+      approvedFinalCount,
+      notApprovedCount,
       evaluationPerformance,
+      students: studentsList,
       generatedAt: new Date()
     };
   }

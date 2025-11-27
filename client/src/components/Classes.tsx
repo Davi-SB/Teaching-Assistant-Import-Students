@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Class, CreateClassRequest, getClassId } from '../types/Class';
 import { Student } from '../types/Student';
-import { Report } from '../types/Report';
+import { ReportData } from '../types/Report';
 import ClassService from '../services/ClassService';
 import { studentService } from '../services/StudentService';
 import EnrollmentService from '../services/EnrollmentService';
@@ -13,6 +13,8 @@ interface ClassesProps {
   onClassDeleted: () => void;
   onError: (errorMessage: string) => void;
 }
+
+type FilterOption = 'ALL' | 'APPROVED' | 'BELOW_AVG' | 'BELOW_X';
 
 const Classes: React.FC<ClassesProps> = ({ 
   classes, 
@@ -37,8 +39,12 @@ const Classes: React.FC<ClassesProps> = ({
 
   // Report state
   const [reportPanelClass, setReportPanelClass] = useState<Class | null>(null);
-  const [reportData, setReportData] = useState<Report | null>(null);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
+
+  // Filter state
+  const [filterType, setFilterType] = useState<FilterOption>('ALL');
+  const [customThreshold, setCustomThreshold] = useState<number>(7.0);
 
   // Load all students for enrollment dropdown
   const loadAllStudents = useCallback(async () => {
@@ -131,6 +137,8 @@ const Classes: React.FC<ClassesProps> = ({
   const handleOpenReportPanel = async (classObj: Class) => {
     setReportPanelClass(classObj);
     setIsLoadingReport(true);
+    setFilterType('ALL');
+    setCustomThreshold(7.0);
     
     try {
       const report = await ClassService.getClassReport(classObj.id);
@@ -140,6 +148,50 @@ const Classes: React.FC<ClassesProps> = ({
       setReportPanelClass(null);
     } finally {
       setIsLoadingReport(false);
+    }
+  };
+
+  // Filtering logic
+  const filteredStudents = useMemo(() => {
+    if (!reportData || !reportData.students) return [];
+
+    return reportData.students.filter(student => {
+      switch (filterType) {
+        case 'ALL':
+          return true;
+        
+        case 'APPROVED':
+          return student.status === 'APPROVED' || student.status === 'APPROVED_FINAL';
+        
+        case 'BELOW_AVG':
+          return student.finalGrade < reportData.studentsAverage;
+        
+        case 'BELOW_X':
+          return student.finalGrade < customThreshold;
+          
+        default:
+          return true;
+      }
+    });
+  }, [reportData, filterType, customThreshold]);
+
+
+  const getGradeClass = (grade: number) => {
+    if (grade >= 7.0) return 'grade-high';
+    if (grade >= 4.0) return 'grade-medium';
+    return 'grade-low';
+  };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'APPROVED':
+        return { label: 'Aprovado', className: 'status-approved' };
+      case 'APPROVED_FINAL':
+        return { label: 'Aprovado (Final)', className: 'status-approved-final' };
+      case 'FAILED':
+        return { label: 'Reprovado', className: 'status-failed' };
+      default:
+        return { label: status, className: '' };
     }
   };
 
@@ -552,6 +604,96 @@ const Classes: React.FC<ClassesProps> = ({
                         </table>
                       </div>
                     )}
+                  </div>
+
+                  <div className="student-list-section">
+                    <div className="section-header">
+                      <h4>Detailed Student Results</h4>
+                      
+                      <div className="filter-group">
+                        <div className="filter-control">
+                          <label htmlFor="filterType">Filter:</label>
+                          <select
+                            id="filterType"
+                            value={filterType}
+                            onChange={(e) => setFilterType(e.target.value as FilterOption)}
+                            className="filter-select"
+                          >
+                            <option value="ALL">All Students</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="BELOW_AVG">Below Class Average</option>
+                            <option value="BELOW_X">Below specific grade...</option>
+                          </select>
+                        </div>
+
+                        {filterType === 'BELOW_X' && (
+                          <div className="filter-control fade-in">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              max="10"
+                              value={customThreshold}
+                              onChange={(e) => setCustomThreshold(Number(e.target.value))}
+                              className="filter-input-x"
+                            />
+                          </div>
+                        )}
+
+                        {filterType === 'BELOW_AVG' && (
+                          <span className="avg-indicator">
+                            Avg: {reportData.studentsAverage.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="table-container">
+                      <table className="student-table">
+                        <thead>
+                          <tr>
+                            <th>Student</th>
+                            <th>ID / CPF</th>
+                            <th>Final Grade</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredStudents.length > 0 ? (
+                            filteredStudents.map((student) => {
+                              const statusConfig = getStatusConfig(student.status);
+                              return (
+                                <tr key={student.studentId}>
+                                  <td><strong>{student.name}</strong></td>
+                                  <td style={{ color: '#666' }}>{student.studentId}</td>
+                                  <td>
+                                    <span className={getGradeClass(student.finalGrade)}>
+                                      {student.finalGrade.toFixed(2)}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <span className={`status-badge ${statusConfig.className}`}>
+                                      {statusConfig.label}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr className="empty-state-row">
+                              <td colSpan={4}>
+                                {filterType === 'ALL' 
+                                  ? 'No students enrolled in this class.' 
+                                  : 'No students found matching this filter.'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#888', textAlign: 'right' }}>
+                      Showing {filteredStudents.length} of {reportData.totalEnrolled} students
+                    </div>
                   </div>
 
                   {/* Report Generated Timestamp */}
