@@ -63,3 +63,29 @@ Scenario: Multiple columns file
     Then I am redirected to the "Success" screen
     And the screen shows the summary "1 student imported successfully and 0 student rejected"
     And when I return to the "Class A" student list, student "11111122222" is listed
+# Service-level scenarios testing REST API endpoints
+
+Scenario: Get student by CPF via API
+    Given the system has a student with CPF "11111111111", name "Paulo Borba" and email "phmb@cin.ufpe.br"
+    When a "GET" request is sent to "/api/students/11111111111"
+    Then the response status should be "200"
+    And the response JSON should contain CPF "11111111111", name "Paulo Borba" and email "phmb@cin.ufpe.br"
+
+Scenario: Get all classes via API
+    Given the system has the following classes:
+      | topic                                | semester | year |
+      | Engenharia de Software e Sistemas    | 1        | 2025 |
+      | Engenharia de Software e Sistemas    | 2        | 2025 |
+    When a "GET" request is sent to "/api/classes"
+    Then the response status should be "200"
+    And the response JSON should be a list of classes
+    And the class with topic "Engenharia de Software e Sistemas", semester "1" and year "2025" is in the list
+    And the class with topic "Engenharia de Software e Sistemas", semester "2" and year "2025" is in the list
+
+Scenario: Enroll student in class via API
+    Given the system has a student with CPF "11111122222", name "Test Student" and email "test@test.com"
+    And the system has a class with id "TestAPIClass-2025-1"
+    And the student with CPF "11111122222" is not enrolled in class "TestAPIClass-2025-1"
+    When a "POST" request is sent to "/api/classes/TestAPIClass-2025-1/enroll" with body containing studentCPF "11111122222"
+    Then the response status should be "201"
+    And the student with CPF "11111122222" should be enrolled in class "TestAPIClass-2025-1"

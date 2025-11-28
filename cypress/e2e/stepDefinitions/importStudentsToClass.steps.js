@@ -830,3 +830,239 @@ Then('when I return to the "Class A" student list, student {string} is listed', 
   cy.contains('Test Student').should('be.visible');
   cy.log(`Verified student ${cpf} is enrolled`);
 });
+
+// ============================================
+// Step Definitions for Service-level API tests
+// ============================================
+
+// Context for API testing
+let apiContext = {
+  response: null,
+  createdResources: {
+    students: [],
+    classes: []
+  }
+};
+
+/**
+ * Given: System has a student with specific details
+ */
+Given('the system has a student with CPF {string}, name {string} and email {string}', function (cpf, name, email) {
+  const studentPayload = { name, cpf, email };
+  
+  cy.request({
+    method: 'DELETE',
+    url: `${API_BASE_URL}/api/students/${cpf}`,
+    failOnStatusCode: false
+  }).then(() => {
+    cy.request({
+      method: 'POST',
+      url: `${API_BASE_URL}/api/students`,
+      body: studentPayload
+    }).then((response) => {
+      expect(response.status).to.eq(201);
+      apiContext.createdResources.students.push(cpf);
+      testContext.createdStudentCPFs.push(cpf);
+    });
+  });
+});
+
+/**
+ * Given: System has multiple classes (table data)
+ */
+Given('the system has the following classes:', function (dataTable) {
+  const classes = dataTable.hashes();
+  
+  classes.forEach(classData => {
+    const classPayload = {
+      topic: classData.topic,
+      semester: parseInt(classData.semester),
+      year: parseInt(classData.year)
+    };
+    
+    const classId = `${classData.topic}-${classData.year}-${classData.semester}`;
+    
+    cy.request({
+      method: 'DELETE',
+      url: `${API_BASE_URL}/api/classes/${classId}`,
+      failOnStatusCode: false
+    }).then(() => {
+      cy.request({
+        method: 'POST',
+        url: `${API_BASE_URL}/api/classes`,
+        body: classPayload,
+        failOnStatusCode: false
+      }).then((response) => {
+        if (response.status === 201) {
+          apiContext.createdResources.classes.push(response.body.id);
+          testContext.createdClassId = response.body.id;
+        }
+      });
+    });
+  });
+});
+
+/**
+ * Given: System has a class with specific ID
+ */
+Given('the system has a class with id {string}', function (classId) {
+  // Extract topic, year, semester from classId format: "Topic-Year-Semester"
+  const parts = classId.split('-');
+  const semester = parseInt(parts[parts.length - 1]);
+  const year = parseInt(parts[parts.length - 2]);
+  const topic = parts.slice(0, parts.length - 2).join('-');
+  
+  const classPayload = { topic, semester, year };
+  
+  cy.request({
+    method: 'DELETE',
+    url: `${API_BASE_URL}/api/classes/${encodeURIComponent(classId)}`,
+    failOnStatusCode: false
+  }).then(() => {
+    cy.request({
+      method: 'POST',
+      url: `${API_BASE_URL}/api/classes`,
+      body: classPayload
+    }).then((response) => {
+      expect(response.status).to.eq(201);
+      apiContext.createdResources.classes.push(response.body.id);
+      testContext.createdClassId = response.body.id;
+    });
+  });
+});
+
+/**
+ * Given: Student is not enrolled in class
+ */
+Given('the student with CPF {string} is not enrolled in class {string}', function (cpf, classId) {
+  cy.request({
+    method: 'DELETE',
+    url: `${API_BASE_URL}/api/classes/${encodeURIComponent(classId)}/enroll/${cpf}`,
+    failOnStatusCode: false
+  });
+});
+
+/**
+ * When: Send GET request to endpoint
+ */
+When('a {string} request is sent to {string}', function (method, endpoint) {
+  cy.request({
+    method: method,
+    url: `${API_BASE_URL}${endpoint}`,
+    failOnStatusCode: false
+  }).then((response) => {
+    apiContext.response = response;
+  });
+});
+
+/**
+ * When: Send POST request with body
+ */
+When('a {string} request is sent to {string} with body containing studentCPF {string}', function (method, endpoint, studentCPF) {
+  cy.request({
+    method: method,
+    url: `${API_BASE_URL}${endpoint}`,
+    body: { studentCPF },
+    failOnStatusCode: false
+  }).then((response) => {
+    apiContext.response = response;
+  });
+});
+
+/**
+ * Then: Verify response status
+ */
+Then('the response status should be {string}', function (expectedStatus) {
+  expect(apiContext.response.status).to.eq(parseInt(expectedStatus));
+});
+
+/**
+ * Then: Verify response JSON contains student data
+ */
+Then('the response JSON should contain CPF {string}, name {string} and email {string}', function (cpf, name, email) {
+  // The API returns CPF formatted, so we need to check both the formatted and unformatted versions
+  const formattedCPF = apiContext.response.body.cpf;
+  const cleanedReturnedCPF = formattedCPF.replace(/[.\-]/g, '');
+  
+  expect(cleanedReturnedCPF).to.eq(cpf);
+  expect(apiContext.response.body).to.have.property('name', name);
+  expect(apiContext.response.body).to.have.property('email', email);
+});
+
+/**
+ * Then: Verify response is a list of classes
+ */
+Then('the response JSON should be a list of classes', function () {
+  expect(apiContext.response.body).to.be.an('array');
+  expect(apiContext.response.body.length).to.be.greaterThan(0);
+});
+
+/**
+ * Then: Verify specific class is in the list
+ */
+Then('the class with topic {string}, semester {string} and year {string} is in the list', function (topic, semester, year) {
+  const foundClass = apiContext.response.body.find(c => 
+    c.topic === topic && 
+    c.semester === parseInt(semester) && 
+    c.year === parseInt(year)
+  );
+  expect(foundClass).to.exist;
+});
+
+/**
+ * Then: Verify student is enrolled in class
+ */
+Then('the student with CPF {string} should be enrolled in class {string}', function (cpf, classId) {
+  // Since there's no GET /api/classes/:id endpoint, we fetch all classes and filter
+  cy.request({
+    method: 'GET',
+    url: `${API_BASE_URL}/api/classes`
+  }).then((response) => {
+    expect(response.status).to.eq(200);
+    
+    const classData = response.body.find(c => c.id === classId);
+    expect(classData, `Class with ID ${classId} should exist`).to.exist;
+    
+    // In the JSON, enrollments contain { student: {...}, evaluations: [...] }
+    const enrollment = classData.enrollments.find(e => {
+      const cleanedEnrollmentCPF = e.student.cpf.replace(/[.\-]/g, '');
+      return cleanedEnrollmentCPF === cpf;
+    });
+    expect(enrollment, `Student ${cpf} should be enrolled`).to.exist;
+  });
+});
+
+/**
+ * After hook for API tests - cleanup created resources
+ */
+After({ tags: '@api' }, function () {
+  // Clean up API test resources
+  if (apiContext.createdResources.students.length > 0) {
+    apiContext.createdResources.students.forEach(cpf => {
+      cy.request({
+        method: 'DELETE',
+        url: `${API_BASE_URL}/api/students/${cpf}`,
+        failOnStatusCode: false
+      });
+    });
+  }
+  
+  if (apiContext.createdResources.classes.length > 0) {
+    apiContext.createdResources.classes.forEach(classId => {
+      cy.request({
+        method: 'DELETE',
+        url: `${API_BASE_URL}/api/classes/${classId}`,
+        failOnStatusCode: false
+      });
+    });
+  }
+  
+  // Reset API context
+  apiContext = {
+    response: null,
+    createdResources: {
+      students: [],
+      classes: []
+    }
+  };
+});
