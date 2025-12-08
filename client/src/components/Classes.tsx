@@ -4,7 +4,7 @@ import { Student } from '../types/Student';
 import ClassService from '../services/ClassService';
 import { studentService } from '../services/StudentService';
 import EnrollmentService from '../services/EnrollmentService';
-import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DE_MEDIA } from '../types/EspecificacaoDoCalculoDaMedia';
+import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DE_MEDIA, EspecificacaoDoCalculoDaMedia } from '../types/EspecificacaoDoCalculoDaMedia';
 import ClassReport from './ClassReport';
 
 interface ClassesProps {
