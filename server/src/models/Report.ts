@@ -53,10 +53,32 @@ export class Report implements IReportGenerator {
     this.approvalCriteria = approvalCriteria;
   }
 
+  // Gets the grade values from the class specification or returns defaults.
+  private getGradeValues(): Record<Grade, number> {
+    const defaultValues: Record<Grade, number> = {
+      'MA': 10,
+      'MPA': 7,
+      'MANA': 0
+    };
 
-  
+    try {
+      const especificacao = this.classObj.getEspecificacaoDoCalculoDaMedia();
+      const json = especificacao.toJSON();
+      if (json.pesosDosConceitos) {
+        return {
+          'MA': json.pesosDosConceitos['MA'] ?? defaultValues['MA'],
+          'MPA': json.pesosDosConceitos['MPA'] ?? defaultValues['MPA'],
+          'MANA': json.pesosDosConceitos['MANA'] ?? defaultValues['MANA']
+        };
+      }
+    } catch {
+      // Use default values
+    }
+
+    return defaultValues;
+  }
+
   // Calculates the student average. Returns null if no grade data is available.
-   
   private calculateStudentAverage(enrollment: Enrollment): number | null {
     const mediaPreFinal = enrollment.getMediaPreFinal();
     if (mediaPreFinal !== null && mediaPreFinal !== 0) {
@@ -85,11 +107,7 @@ export class Report implements IReportGenerator {
       // Fall through to simple average calculation
     }
 
-    const gradeValues: Record<Grade, number> = {
-      'MA': 10,
-      'MPA': 7,
-      'MANA': 0
-    };
+    const gradeValues = this.getGradeValues();
 
     const totalGrade = evaluations.reduce((sum, evaluation) => {
       return sum + gradeValues[evaluation.getGrade()];
@@ -107,7 +125,8 @@ export class Report implements IReportGenerator {
     return this.calculateStudentAverage(enrollment);
   }
 
-  // Calculates the class average. Returns null if no students have grades.
+  // Calculates the class average. Returns null if no students have finalized grades.
+  // Only includes students who are not PENDING.
   private calculateClassAverage(): number | null {
     const enrollments = this.classObj.getEnrollments();
     
@@ -115,8 +134,8 @@ export class Report implements IReportGenerator {
       return null;
     }
 
-    // Only include students who have grade data
     const gradesWithData = enrollments
+      .filter(enrollment => this.getStudentStatus(enrollment) !== 'PENDING')
       .map(enrollment => this.getStudentFinalGrade(enrollment))
       .filter((grade): grade is number => grade !== null);
 
@@ -191,12 +210,7 @@ export class Report implements IReportGenerator {
       });
     });
 
-    const gradeValues: Record<Grade, number> = {
-      'MA': 10,
-      'MPA': 7,
-      'MANA': 4
-    };
-
+    const gradeValues = this.getGradeValues();
     const performance: EvaluationPerformance[] = [];
 
     goalMap.forEach((data, goal) => {
