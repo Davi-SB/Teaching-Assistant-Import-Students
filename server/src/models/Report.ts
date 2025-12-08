@@ -42,6 +42,8 @@ export interface ReportData {
 
 export interface IReportGenerator {
   generate(): ReportData;
+  
+  toJSON(): ReportData;
 }
 
 export class Report implements IReportGenerator {
