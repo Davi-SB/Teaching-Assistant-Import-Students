@@ -147,7 +147,7 @@ const ClassReport: React.FC<ClassReportProps> = ({ classObj, onClose, onError })
                           <tr key={student.studentId}>
                             <td><strong>{student.name}</strong></td>
                             <td>{student.finalGrade !== null ? student.finalGrade.toFixed(2) : '–'}</td>
-                            <td className={`status-${student.status.toLowerCase().replace('_', '-')}`}>
+                            <td className={`status-${student.status.toLowerCase().replace(/_/g, '-')}`}>
                               {formatStatus(student.status)}
                             </td>
                           </tr>
