@@ -5,6 +5,7 @@ import ClassService from '../services/ClassService';
 import { studentService } from '../services/StudentService';
 import EnrollmentService from '../services/EnrollmentService';
 import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DE_MEDIA, EspecificacaoDoCalculoDaMedia } from '../types/EspecificacaoDoCalculoDaMedia';
+import ClassReport from './ClassReport';
 
 interface ClassesProps {
   classes: Class[];
@@ -35,6 +36,9 @@ const Classes: React.FC<ClassesProps> = ({
   const [enrollmentPanelClass, setEnrollmentPanelClass] = useState<Class | null>(null);
   const [selectedStudentsForEnrollment, setSelectedStudentsForEnrollment] = useState<Set<string>>(new Set());
   const [isEnrolling, setIsEnrolling] = useState(false);
+
+  // Report state - only track which class to show report for
+  const [reportPanelClass, setReportPanelClass] = useState<Class | null>(null);
 
   // Load all students for enrollment dropdown
   const loadAllStudents = useCallback(async () => {
@@ -121,6 +125,16 @@ const Classes: React.FC<ClassesProps> = ({
   const getAvailableStudentsForClass = (classObj: Class): Student[] => {
     const enrolledStudentCPFs = new Set(classObj.enrollments.map(enrollment => enrollment.student.cpf));
     return allStudents.filter(student => !enrolledStudentCPFs.has(student.cpf));
+  };
+
+  // Handle opening report panel for a specific class
+  const handleOpenReportPanel = (classObj: Class) => {
+    setReportPanelClass(classObj);
+  };
+
+  // Handle closing report panel
+  const handleCloseReportPanel = () => {
+    setReportPanelClass(null);
   };
 
   // Handle form input changes
@@ -302,27 +316,36 @@ const Classes: React.FC<ClassesProps> = ({
                     <td><strong>{classObj.semester === 1 ? '1st Semester' : '2nd Semester'}</strong></td>
                     <td>{classObj.enrollments.length}</td>
                     <td>
-                      <button
-                        className="edit-btn"
-                        onClick={() => handleEdit(classObj)}
-                        title="Edit class"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleDelete(classObj)}
-                        title="Delete class"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        className="enroll-btn"
-                        onClick={() => handleOpenEnrollmentPanel(classObj)}
-                        title="Enroll students"
-                      >
-                        Enroll
-                      </button>
+                      <div className="actions-grid">
+                        <button
+                          className="edit-btn"
+                          onClick={() => handleEdit(classObj)}
+                          title="Edit class"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDelete(classObj)}
+                          title="Delete class"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="enroll-btn"
+                          onClick={() => handleOpenEnrollmentPanel(classObj)}
+                          title="Enroll students"
+                        >
+                          Enroll
+                        </button>
+                        <button
+                          className="report-btn"
+                          onClick={() => handleOpenReportPanel(classObj)}
+                          title="View class report"
+                        >
+                          Report
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -436,6 +459,15 @@ const Classes: React.FC<ClassesProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Report Panel */}
+      {reportPanelClass && (
+        <ClassReport
+          classObj={reportPanelClass}
+          onClose={handleCloseReportPanel}
+          onError={onError}
+        />
       )}
     </div>
   );
