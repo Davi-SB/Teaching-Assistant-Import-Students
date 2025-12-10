@@ -42,8 +42,9 @@ const StatusPieChart: React.FC<StatusPieChartProps> = ({ data }) => {
 
   const hasData = chartData.length > 0;
 
-  const renderCustomLabel = ({ name, percent }: { name: string; percent: number }) => {
-    return `${name}: ${(percent * 100).toFixed(0)}%`;
+  const renderCustomLabel = ({ name, percent }: { name?: string; percent?: number }) => {
+    if (percent === undefined) return '';
+    return `${name || ''}: ${(percent * 100).toFixed(0)}%`;
   };
 
   return (
