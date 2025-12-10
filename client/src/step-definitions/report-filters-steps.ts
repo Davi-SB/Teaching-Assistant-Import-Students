@@ -74,7 +74,7 @@ Given('the following students have evaluations for the GUI test:', async functio
   console.log(`Setting up ${rows.length} students with evaluations.`);
 
   for (const row of rows) {
-    // Clean up before creating (idempotency)
+    // Clean up before creating
     await fetch(`${serverUrl}/api/students/${row.cpf}`, { method: 'DELETE' }).catch(() => {});
     
     // Create Student
@@ -138,7 +138,7 @@ When('I click on the report button for the class {string}', async function (clas
     else throw new Error('Report button not found');
   }
 
-  await page.waitForSelector('table.student-table, .empty-state-row', { timeout: 10000 });
+  await page.waitForSelector('table.students-table, .empty-state-row', { timeout: 10000 });
 });
 
 When('I select {string} in the filter dropdown', async function (optionText: string) {
@@ -153,6 +153,7 @@ When('I select {string} in the filter dropdown', async function (optionText: str
   await page.waitForSelector(selector);
   
   await page.select(selector, value);
+  
   await page.evaluate((sel, val) => {
     const el = document.querySelector(sel) as HTMLSelectElement;
     el.value = val;
@@ -184,14 +185,14 @@ Then('the student table should show exactly {int} students', async function (cou
 
 Then('the student {string} should be visible in the list', async function (name: string) {
   console.log(`Verifying visibility of student: ${name}`);
-  const xpath = `xpath///table[contains(@class, 'student-table')]//td[contains(., '${name}')]`;
+  const xpath = `xpath///table[contains(@class, 'students-table')]//td[contains(., '${name}')]`;
   await page.waitForSelector(xpath, { timeout: 5000 });
   console.log(`Student ${name} is visible as expected.`);
 });
 
 Then('the student {string} should NOT be visible in the list', async function (name: string) {
   console.log(`Verifying absence of student: ${name}`);
-  const xpath = `xpath///table[contains(@class, 'student-table')]//td[contains(., '${name}')]`;
+  const xpath = `xpath///table[contains(@class, 'students-table')]//td[contains(., '${name}')]`;
   const elements = await page.$$(xpath);
   expect(elements.length).toBe(0);
   console.log(`Student ${name} is not visible as expected.`);
@@ -201,9 +202,11 @@ async function verifyTableCount(expectedCount: number) {
   try {
     await page.waitForFunction(
       (expected) => {
-        const rows = document.querySelectorAll('table.student-table tbody tr');
+        const rows = document.querySelectorAll('table.students-table tbody tr');
         const emptyState = document.querySelector('.empty-state-row');
+        
         if (expected === 0) return !!emptyState || rows.length === 0;
+        
         const realRows = Array.from(rows).filter(r => !r.classList.contains('empty-state-row'));
         return realRows.length === expected;
       },

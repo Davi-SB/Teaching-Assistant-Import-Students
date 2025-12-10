@@ -129,8 +129,20 @@ return (
                     <span className="stat-value approved">{reportData.approvedCount}</span>
                   </div>
                   <div className="stat-item">
+                    <span className="stat-label">Approved (Final):</span>
+                    <span className="stat-value approved">{reportData.approvedFinalCount}</span>
+                  </div>
+                  <div className="stat-item">
                     <span className="stat-label">Not Approved:</span>
                     <span className="stat-value not-approved">{reportData.notApprovedCount}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Failed by Absence:</span>
+                    <span className="stat-value not-approved">{reportData.failedByAbsenceCount}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-label">Pending:</span>
+                    <span className="stat-value pending">{reportData.pendingCount}</span>
                   </div>
                 </div>
               </div>
@@ -188,8 +200,8 @@ return (
                 )}
               </div>
 
-              {/* Student List Section com Filtros */}
-              <div className="student-list-section">
+              {/* Student Table */}
+              <div className="students-results">
                 <div className="section-header">
                   <h4>Detailed Student Results</h4>
                   
@@ -232,36 +244,30 @@ return (
                 </div>
 
                 <div className="table-container">
-                  <table className="student-table">
+                  <table className="students-table">
                     <thead>
                       <tr>
                         <th>Student</th>
-                        <th>ID / CPF</th>
+                        <th>CPF</th> 
                         <th>Final Grade</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredStudents.length > 0 ? (
-                        filteredStudents.map((student) => {
-                          const statusConfig = getStatusConfig(student.status);
-                          return (
-                            <tr key={student.studentId}>
-                              <td><strong>{student.name}</strong></td>
-                              <td style={{ color: '#666' }}>{student.studentId}</td>
-                              <td>
-                                <span className={getGradeClass(student.finalGrade)}>
-                                  {student.finalGrade !== null ? student.finalGrade.toFixed(2) : '-'}
-                                </span>
-                              </td>
-                              <td>
-                                <span className={`status-badge ${statusConfig.className}`}>
-                                  {statusConfig.label}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
+                        filteredStudents.map((student) => (
+                          <tr key={student.studentId}>
+                            <td><strong>{student.name}</strong></td>
+                            
+                            <td style={{ color: '#666' }}>{student.studentId}</td>
+                            <td>
+                              {student.finalGrade !== null ? student.finalGrade.toFixed(2) : '–'}
+                            </td>
+                            <td className={`status-${student.status.toLowerCase().replace(/_/g, '-')}`}>
+                              {typeof formatStatus === 'function' ? formatStatus(student.status) : student.status}
+                            </td>
+                          </tr>
+                        ))
                       ) : (
                         <tr className="empty-state-row">
                           <td colSpan={4}>
@@ -274,6 +280,7 @@ return (
                     </tbody>
                   </table>
                 </div>
+                
                 <div style={{ marginTop: '10px', fontSize: '0.8rem', color: '#888', textAlign: 'right' }}>
                   Showing {filteredStudents.length} of {reportData.totalEnrolled} students
                 </div>
@@ -305,5 +312,16 @@ return (
     </div>
   );
 };
+
+function formatStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    'APPROVED': 'Approved',
+    'APPROVED_FINAL': 'Approved (Final)',
+    'FAILED': 'Failed',
+    'FAILED_BY_ABSENCE': 'Failed (Absence)',
+    'PENDING': 'Pending'
+  };
+  return statusMap[status] || status;
+}
 
 export default ClassReport;
